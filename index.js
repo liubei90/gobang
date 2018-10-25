@@ -1,6 +1,7 @@
 // 五子棋
 function GoBang(elm, maxLines, player1, player2) {
-  this.chessPiecesArea = [];
+  this.chessPiecesPath = [];
+  this.chessPiecesMap = {};
   this.player1 = player1;
   this.player2 = player2;
   this.chessBoard = new ChessBoard(elm, maxLines);
@@ -45,19 +46,20 @@ GoBang.prototype.next = function() {
 }
 
 GoBang.prototype.getNextChessPieces = function() {
-  this.currentPlayer.getChessPieces(this.chessPiecesArea, function(chessPieces) {
-    if (!this.checkNextChessPieces(chessPieces)) {
-      return this.getNextChessPieces();
+  var self = this;
+  this.currentPlayer.getChessPieces(this.chessPiecesMap, function(chessPieces) {
+    if (!self.checkNextChessPieces(chessPieces)) {
+      return self.getNextChessPieces();
     }
 
-    this.addChessPieces(chessPieces);
-    this.state = this.isOver();
+    self.addChessPieces(chessPieces);
+    self.state = self.isOver();
 
-    if (this.state === 0) {
-      return this.next();
+    if (self.state === 0) {
+      return self.next();
     }
 
-    this.over();
+    self.over();
   });
 }
 
@@ -76,16 +78,72 @@ function ChessBoard(elm, maxLines) {
 
 
 // 棋子
-function ChessPieces() {
+function ChessPieces(x, y, player) {
+  this.x = x;
+  this.y = y;
+  this.player = player;
+}
 
+function Player(flag, style) {
+  this.flag = flag;
+  this.style = style;
+  this.state = Player.STATE_WAIT;
+}
+
+Player.STATE_WAIT = 0; // 等待对手落子
+Player.STATE_CHESS = 1; // 自己落子
+
+Player.prototype.init = function(chessBoard) {
+  this.chessBoard = chessBoard;
+}
+
+Player.prototype.getChessPieces = function(chessPiecesMap, next) {
+  ;
 }
 
 // 人
-function PersionPlayer() {
+function PersionPlayer(flag, style) {
+  Player.call(this, flag, style);
+  this.next = null;
+}
+PersionPlayer.prototype = Object.create(Player.prototype);
+PersionPlayer.constructor = PersionPlayer;
 
+// 向棋盘注册落子事件，fixme: 是否在游戏结束时移除改事件。还是在棋盘中统一移除
+PersionPlayer.prototype.init = function(chessBoard) {
+  var self = this;
+  this.chessBoard = chessBoard;
+  this.chessBoard.registerChessHandler(function(x, y) {
+    self.chessHandler(x, y);
+  });
 }
 
-// 机
-function ComputerPlayer() {
+PersionPlayer.prototype.chessHandler = function(x, y) {
+  if (this.state === Player.STATE_CHESS) {
+    var chessPieces = new ChessPieces(0, 0, this.flag);
 
+    this.next(chessPieces);
+  };
+}
+
+// 设置当前角色为可接受落子事件
+PersionPlayer.prototype.getChessPieces = function(chessPiecesMap, next) {
+  this.state = Player.STATE_CHESS;
+  this.next = next;
+}
+
+
+// 机器人
+function ComputerPlayer(flag, style) {
+  Player.call(this, flag, style);
+}
+
+ComputerPlayer.prototype = Object.create(Player.prototype);
+ComputerPlayer.constructor = ComputerPlayer;
+
+// 重载角色的落子函数，机器人直接计算当前棋盘，获取棋子后直接返回
+ComputerPlayer.prototype.getChessPieces = function(chessPiecesMap, next) {
+  var chessPieces = new ChessPieces(0, 0, this.flag);
+
+  next(chessPieces);
 }
