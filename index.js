@@ -1,12 +1,19 @@
+var GOBANG_LINE_COUNT = 16; // 五子棋格数
+
 // 五子棋
-function GoBang(elm, maxLines, player1, player2) {
+function GoBang(elmId, player1, player2) {
+  var elm = document.getElementById(elmId);
+
   this.chessPiecesPath = [];
   this.chessPiecesMap = {};
   this.player1 = player1;
   this.player2 = player2;
-  this.chessBoard = new ChessBoard(elm, maxLines);
+  this.chessBoard = new ChessBoard(elm);
   this.currentPlayer = null;
   this.state = -1; // 0 下棋中 1 player1胜 2 player2胜 3平局 
+
+  this.player1.init(this.chessBoard);
+  this.player2.init(this.chessBoard);
 }
 
 GoBang.prototype.initChessPiecesArea = function() {
@@ -38,7 +45,7 @@ GoBang.prototype.next = function() {
     this.currentPlayer = this.player1;
   } else if (this.currentPlayer === this.player1) {
     this.currentPlayer = this.player2;
-  } else () {
+  } else {
     this.currentPlayer = this.player1;
   }
 
@@ -72,8 +79,43 @@ GoBang.prototype.addChessPieces = function(chessPieces) {
 }
 
 // 棋盘，用来绘制
-function ChessBoard(elm, maxLines) {
+function ChessBoard(elm) {
+  this.elm = elm;
+  this.chessHandlers = [];
 
+  this.drawGrid();
+  this.registerClickHandler();
+}
+
+ChessBoard.prototype.registerChessHandler = function(callback) {
+  this.chessHandlers.push(callback);
+}
+
+ChessBoard.prototype.registerClickHandler = function() {
+  var self = this;
+  this.elm.addEventListener('click', function(event) {
+    self.clickHandler(event);
+  })
+}
+
+ChessBoard.prototype.clickHandler = function(event) {
+  ;
+}
+
+ChessBoard.prototype.drawGrid = function() {
+  var elm = this.elm;
+  var react = elm.getBoundingClientRect();
+  var width = react.width;
+  var height = react.height;
+  width % GOBANG_LINE_COUNT
+  var gridWidth = Math.floor(width/GOBANG_LINE_COUNT - 1);
+  var gridHeight = Math.floor(height/GOBANG_LINE_COUNT - 1);
+
+  elm.style.background = '-moz-linear-gradient(180deg, transparent ' + (gridHeight - 1) + 'px, blue ' + gridHeight + 'px),' 
+                        + '-moz-linear-gradient(90deg, transparent ' + (gridWidth - 1) + 'px, blue ' + gridWidth + 'px)';
+                        
+  elm.style.backgroundRepeat = 'repeat';
+  elm.style.backgroundSize = gridWidth + 'px ' + gridHeight + 'px';
 }
 
 
@@ -147,3 +189,8 @@ ComputerPlayer.prototype.getChessPieces = function(chessPiecesMap, next) {
 
   next(chessPieces);
 }
+
+
+var player1 = new PersionPlayer('1');
+var player2 = new PersionPlayer('2');
+var gobang = new GoBang('chessboard', player1, player2);
