@@ -10,7 +10,7 @@ function GoBang(elmId, player1, player2) {
   this.player2 = player2;
   this.chessBoard = new ChessBoard(elm);
   this.currentPlayer = null;
-  this.state = -1; // 0 下棋中 1 player1胜 2 player2胜 3平局 
+  this.state = -1; // 0 下棋中 1 player1胜 2 player2胜 3平局
 
   this.player1.init(this.chessBoard);
   this.player2.init(this.chessBoard);
@@ -32,7 +32,7 @@ GoBang.prototype.start = function() {
 
 // 判断是否结束
 GoBang.prototype.isOver = function() {
-  ;
+  return 0;
 }
 
 GoBang.prototype.over = function() {
@@ -49,17 +49,20 @@ GoBang.prototype.next = function() {
     this.currentPlayer = this.player1;
   }
 
-  this.getNextChessPieces();
+  // 由于在点击事件中，一个玩家会触发另一个玩家状态的改变，然后另一个玩家也会响应当前点击事件
+  var self = this;
+  setTimeout(function() {
+    self.getNextChessPieces();
+  }, 0);
 }
 
 GoBang.prototype.getNextChessPieces = function() {
   var self = this;
   this.currentPlayer.getChessPieces(this.chessPiecesMap, function(chessPieces) {
-    if (!self.checkNextChessPieces(chessPieces)) {
+    if (!self.addChessPieces(chessPieces)) {
       return self.getNextChessPieces();
     }
 
-    self.addChessPieces(chessPieces);
     self.state = self.isOver();
 
     if (self.state === 0) {
@@ -71,11 +74,33 @@ GoBang.prototype.getNextChessPieces = function() {
 }
 
 GoBang.prototype.checkNextChessPieces = function(chessPieces) {
-  ;
+  return true;
 }
 
 GoBang.prototype.addChessPieces = function(chessPieces) {
-  ;
+  var x = chessPieces.x, y = chessPieces.y, chessPiecesMap = this.chessPiecesMap;
+
+  if (!chessPiecesMap[x]) {
+    chessPiecesMap[x] = {};
+  }
+  if (chessPiecesMap[x][y]) {
+    return false;
+  }
+
+  chessPiecesMap[x][y] = chessPieces;
+  this.chessBoard.addChessPieces(x, y, chessPieces);
+  return true;
+}
+
+// 棋形判断
+ChessPiecesShapeUtil = function() {
+}
+
+ChessPiecesShape.isFive = function(chessPiecesMap, x, y) {
+  if (chessPiecesMap && chessPiecesMap[x] && chessPiecesMap[x][y]) {
+    ;
+  }
+  return false;
 }
 
 // 棋盘，用来绘制
@@ -99,23 +124,50 @@ ChessBoard.prototype.registerClickHandler = function() {
 }
 
 ChessBoard.prototype.clickHandler = function(event) {
-  ;
+  if (event.target !== this.elm) return;
+  var i, handler, clientX = event.clientX, clientY = event.clientY;
+
+  var x = Math.floor((clientX - this.orgLeft + 0.5 * this.gridWidth) / this.gridWidth) + 1;
+  var y = Math.floor((clientY - this.orgTop + 0.5 * this.gridHeight) / this.gridHeight) + 1;
+
+  for (i = 0; i < this.chessHandlers.length; i++) {
+    handler = this.chessHandlers[i];
+    if (typeof handler === 'function') {
+      handler.apply(null, [x, y]);
+    }
+  }
+  event.stopPropagation()
+  event.preventDefault();
 }
 
 ChessBoard.prototype.drawGrid = function() {
   var elm = this.elm;
   var react = elm.getBoundingClientRect();
-  var width = react.width;
-  var height = react.height;
-  width % GOBANG_LINE_COUNT
-  var gridWidth = Math.floor(width/GOBANG_LINE_COUNT - 1);
-  var gridHeight = Math.floor(height/GOBANG_LINE_COUNT - 1);
+  var width = react.width - 1;
+  var height = react.height - 1;
+  var gridCount = this.gridCount = GOBANG_LINE_COUNT - 1;
+  var gridWidth = this.gridWidth = Math.floor(width/gridCount);
+  var gridHeight = this.gridHeight = Math.floor(height/gridCount);
+  var orgLeft = this.orgLeft = (width - (gridWidth * gridCount)) * 0.5;
+  var orgTop = this.orgTop = (height - (gridHeight * gridCount)) * 0.5;
 
-  elm.style.background = '-moz-linear-gradient(180deg, transparent ' + (gridHeight - 1) + 'px, blue ' + gridHeight + 'px),' 
-                        + '-moz-linear-gradient(90deg, transparent ' + (gridWidth - 1) + 'px, blue ' + gridWidth + 'px)';
-                        
+  elm.style.background = 'linear-gradient(180deg, transparent ' + (gridHeight - 1) + 'px, blue ' + gridHeight + 'px),'
+                        + 'linear-gradient(90deg, transparent ' + (gridWidth - 1) + 'px, blue ' + gridWidth + 'px)';
+
   elm.style.backgroundRepeat = 'repeat';
   elm.style.backgroundSize = gridWidth + 'px ' + gridHeight + 'px';
+  elm.style.backgroundPosition = orgLeft + 'px ' + orgTop + 'px';
+}
+
+ChessBoard.prototype.addChessPieces = function(x, y, chessPieces) {
+  var elm = chessPieces.elm = document.createElement('div');
+  elm.classList.add('chess-pieces');
+  elm.style.backgroundColor = chessPieces.player.color;
+  elm.style.width = this.gridWidth + 'px';
+  elm.style.height = this.gridHeight + 'px';
+  elm.style.left = ((x - 1.5) * this.gridWidth + this.orgLeft) + 'px';
+  elm.style.top = ((y - 1.5) * this.gridHeight + this.orgTop) + 'px';
+  this.elm.appendChild(elm);
 }
 
 
@@ -126,9 +178,9 @@ function ChessPieces(x, y, player) {
   this.player = player;
 }
 
-function Player(flag, style) {
+function Player(flag, color) {
   this.flag = flag;
-  this.style = style;
+  this.color = color;
   this.state = Player.STATE_WAIT;
 }
 
@@ -144,8 +196,8 @@ Player.prototype.getChessPieces = function(chessPiecesMap, next) {
 }
 
 // 人
-function PersionPlayer(flag, style) {
-  Player.call(this, flag, style);
+function PersionPlayer(flag, color) {
+  Player.call(this, flag, color);
   this.next = null;
 }
 PersionPlayer.prototype = Object.create(Player.prototype);
@@ -161,9 +213,11 @@ PersionPlayer.prototype.init = function(chessBoard) {
 }
 
 PersionPlayer.prototype.chessHandler = function(x, y) {
+  console.log('chessHandler', this.flag, this.state);
   if (this.state === Player.STATE_CHESS) {
-    var chessPieces = new ChessPieces(0, 0, this.flag);
+    var chessPieces = new ChessPieces(x, y, this);
 
+    this.state = Player.STATE_WAIT;
     this.next(chessPieces);
   };
 }
@@ -191,6 +245,8 @@ ComputerPlayer.prototype.getChessPieces = function(chessPiecesMap, next) {
 }
 
 
-var player1 = new PersionPlayer('1');
-var player2 = new PersionPlayer('2');
+var player1 = new PersionPlayer('1', '#eaeaea');
+var player2 = new PersionPlayer('2', 'black');
 var gobang = new GoBang('chessboard', player1, player2);
+
+gobang.start();
