@@ -180,24 +180,16 @@ ChessPiecesShapeUtil.isFive = function(fiveChessPieces) {
 
 // 是否结束游戏
 ChessPiecesShapeUtil.isOver = function(chessPiecesMap) {
-  var i, j, fiveChessPieces;
+  var i, j, d, fiveChessPieces, directArr = ['b', 'r', 'bl', 'br'];
 
   for (i in chessPiecesMap) {
     if (chessPiecesMap[i]) {
       for (j in chessPiecesMap[i]) {
-        fiveChessPieces = ChessPiecesShapeUtil.getBFiveChessPieces(chessPiecesMap, Number(i), Number(j), 5);
-        if (ChessPiecesShapeUtil.isFive(fiveChessPieces)) {
-          return fiveChessPieces;
-        }
-
-        fiveChessPieces = ChessPiecesShapeUtil.getBLFiveChessPieces(chessPiecesMap, Number(i), Number(j), 5);
-        if (ChessPiecesShapeUtil.isFive(fiveChessPieces)) {
-          return fiveChessPieces;
-        }
-
-        fiveChessPieces = ChessPiecesShapeUtil.getBRFiveChessPieces(chessPiecesMap, Number(i), Number(j), 5);
-        if (ChessPiecesShapeUtil.isFive(fiveChessPieces)) {
-          return fiveChessPieces;
+        for (d = 0; d < directArr.length; d++) {
+          fiveChessPieces = ChessPiecesShapeUtil.getFiveChessPieces(chessPiecesMap, Number(i), Number(j), 5, directArr[d]);
+          if (ChessPiecesShapeUtil.isFive(fiveChessPieces)) {
+            return fiveChessPieces;
+          }
         }
       }
     }
@@ -206,12 +198,33 @@ ChessPiecesShapeUtil.isOver = function(chessPiecesMap) {
   return false;
 }
 
-// 取正下方count个棋子（包括自己）
-ChessPiecesShapeUtil.getBFiveChessPieces = function(chessPiecesMap, x, y, count) {
-  var i, res = [];
+ChessPiecesShapeUtil.getFiveChessPieces = function(chessPiecesMap, x, y, count, direct) {
+  function getNextPos(i, isX) {
+    if (direct === 't') { // 上
+      return isX ? x : (y - i);
+    } else if (direct === 'b') { // 下
+      return isX ? x : (y + i);
+    } else if (direct === 'l') { // 左
+      return isX ? (x - i) : y;
+    } else if (direct === 'r') { // 右
+      return isX ? (x + i) : y;
+    } else if (direct === 'tr') { // 上右
+      return isX ? (x + i) : (y - i);
+    } else if (direct === 'br') { // 下右
+      return isX ? (x + i) :(y + i);
+    } else if (direct === 'tl') { // 上左
+      return isX ? (x - i) :(y - i);
+    } else if (direct === 'bl') { // 下左
+      return isX ? (x - i) : (y + i);
+    }
+  }
+
+  var i, res = [], nextX, nextY;
   for (i = 0; i < count; i++) {
-    if (chessPiecesMap[x] && chessPiecesMap[x][y + i]) {
-      res.push(chessPiecesMap[x][y + i]);
+    nextX = getNextPos(i, true);
+    nextY = getNextPos(i, false);
+    if (chessPiecesMap[nextX] && chessPiecesMap[nextX][nextY]) {
+      res.push(chessPiecesMap[nextX][nextY]);
     } else {
       res.push(null);
     }
@@ -219,31 +232,6 @@ ChessPiecesShapeUtil.getBFiveChessPieces = function(chessPiecesMap, x, y, count)
   return res;
 }
 
-// 取左下方count个棋子（包括自己）
-ChessPiecesShapeUtil.getBLFiveChessPieces = function(chessPiecesMap, x, y, count) {
-  var i, res = [];
-  for (i = 0; i < count; i++) {
-    if (chessPiecesMap[x - i] && chessPiecesMap[x - i][y + i]) {
-      res.push(chessPiecesMap[x - i][y + i]);
-    } else {
-      res.push(null);
-    }
-  }
-  return res;
-}
-
-// 取右下方count个棋子（包括自己）
-ChessPiecesShapeUtil.getBRFiveChessPieces = function(chessPiecesMap, x, y, count) {
-  var i, res = [];
-  for (i = 0; i < count; i++) {
-    if (chessPiecesMap[x + i] && chessPiecesMap[x + i][y + i]) {
-      res.push(chessPiecesMap[x + i][y + i]);
-    } else {
-      res.push(null);
-    }
-  }
-  return res;
-}
 
 // 棋盘，用来绘制
 function ChessBoard(elm) {
