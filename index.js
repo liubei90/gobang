@@ -390,17 +390,276 @@ function ComputerPlayer(flag, style) {
 
 ComputerPlayer.prototype = Object.create(Player.prototype);
 ComputerPlayer.constructor = ComputerPlayer;
-
+ComputerPlayer.PLAYER_SELF = 1;
+ComputerPlayer.PLAYER_OTHER = 2;
 // 重载角色的落子函数，机器人直接计算当前棋盘，获取棋子后直接返回
 ComputerPlayer.prototype.getChessPieces = function(chessPiecesMap, next) {
-  var chessPieces = new ChessPieces(0, 0, this.flag);
 
-  next(chessPieces);
+  var map = this.cloneChessPiecesMap(chessPiecesMap);
+  var pointList = this.genPointList(map);
+  var best = -Infinity, tmp, i, pos, bestList = [];
+
+  for (i = 0; i < pointList.length; i++) {
+    pos = pointList[i];
+    map[pos.x][pos.y] = ComputerPlayer.PLAYER_SELF;
+    // tmp = this.evaluate(map);
+    tmp = this.expectOther(1, map);
+    if (tmp > best) {
+      best = tmp;
+      bestList.length = 0;
+      bestList.push(pos);
+    } else if (tmp === best) {
+      bestList.push(pos);
+    }
+    map[pos.x][pos.y] = 0;
+  }
+
+  var bestPos;
+  if (bestList.length > 0) {
+    bestPos = bestList[Math.floor(Math.random() * bestList.length)];
+  } else {
+    bestPos = pointList[Math.floor(Math.random() * pointList.length)];
+  }
+
+  next(new ChessPieces(bestPos.x + 1, bestPos.y + 1, this));
+}
+
+// 克隆棋盘, 二维数组 当前机器人为1， 对手为2
+ComputerPlayer.prototype.cloneChessPiecesMap = function(chessPiecesMap) {
+  var i, j, p, map = [];
+  for (i = 0; i < GOBANG_LINE_COUNT; i++) {
+    for (j = 0; j < GOBANG_LINE_COUNT; j++) {
+      if (chessPiecesMap[i + 1] && chessPiecesMap[i + 1][j + 1]) {
+        if (chessPiecesMap[i + 1][j + 1].player === this) {
+          p = ComputerPlayer.PLAYER_SELF;
+        } else {
+          p = ComputerPlayer.PLAYER_OTHER;
+        }
+      } else {
+        p = 0;
+      }
+      if (!map[i]) {
+        map[i] = [];
+      }
+      map[i][j] = p;
+    }
+  }
+  return map;
+}
+
+// 预期自己下一步
+ComputerPlayer.prototype.expectSelf = function(dep, map) {
+  var best = -Infinity, tmp, i, pos;
+  var pointList = this.genPointList(map);
+
+  for (i = 0; i < pointList.length; i++) {
+    pos = pointList[i];
+    map[pos.x][pos.y] = ComputerPlayer.PLAYER_SELF;
+    if (dep <= 0) {
+      tmp = this.evaluate(map);
+    } else {
+      tmp = this.expectOther(dep - 1, map);
+    }
+    
+    if (tmp > best) {
+      best = tmp;
+    }
+    map[pos.x][pos.y] = 0;
+  }
+
+  return best;
+}
+
+// 预期对手下一步
+ComputerPlayer.prototype.expectOther = function(dep, map) {
+  var best = Infinity, tmp, i, pos;
+  var pointList = this.genPointList(map);
+
+  for (i = 0; i < pointList.length; i++) {
+    pos = pointList[i];
+    map[pos.x][pos.y] = ComputerPlayer.PLAYER_OTHER;
+    if (dep <= 0) {
+      tmp = this.evaluate(map);
+    } else {
+      tmp = this.expectSelf(dep - 1, map);
+    }
+
+    if (tmp < best) {
+      best = tmp;
+    }
+    map[pos.x][pos.y] = 0;
+  }
+
+  return best;
+}
+
+// 评估当前棋盘的得分，越高机器人赢面越大
+ComputerPlayer.prototype.evaluate = function(map) {
+  var selfScore = 0, otherScore = 0;
+  var i, j, x, y, posList = [];
+
+  // 竖排
+  for (i = 0; i < GOBANG_LINE_COUNT; i++) {
+    for (j = 0; j < GOBANG_LINE_COUNT; j++) {
+      posList.push(map[i][j]);
+    }
+
+    selfScore += this.countScore(posList, ComputerPlayer.PLAYER_SELF);
+    otherScore += this.countScore(posList, ComputerPlayer.PLAYER_OTHER);
+    posList.length = 0;
+  }
+
+  // 横排
+  for (j = 0; j < GOBANG_LINE_COUNT; j++) {
+    for (i = 0; i < GOBANG_LINE_COUNT; i++) {
+      posList.push(map[i][j]);
+    }
+
+    selfScore += this.countScore(posList, ComputerPlayer.PLAYER_SELF);
+    otherScore += this.countScore(posList, ComputerPlayer.PLAYER_OTHER);
+    posList.length = 0;
+  }
+
+  // 上反斜线\
+  for (i = 0; i < GOBANG_LINE_COUNT; i++) {
+    for (x = i, y = 0; x < GOBANG_LINE_COUNT && y < GOBANG_LINE_COUNT; x++, y++) {
+      posList.push(map[x][y]);
+    }
+
+    selfScore += this.countScore(posList, ComputerPlayer.PLAYER_SELF);
+    otherScore += this.countScore(posList, ComputerPlayer.PLAYER_OTHER);
+    posList.length = 0;
+  }
+
+  // 下反斜线\
+  for (i = 1; i < GOBANG_LINE_COUNT; i++) {
+    for (y = i, x = 0; x < GOBANG_LINE_COUNT && y < GOBANG_LINE_COUNT; x++, y++) {
+      posList.push(map[x][y]);
+    }
+
+    selfScore += this.countScore(posList, ComputerPlayer.PLAYER_SELF);
+    otherScore += this.countScore(posList, ComputerPlayer.PLAYER_OTHER);
+    posList.length = 0;
+  }
+
+  // 上斜线/
+  for (i = (GOBANG_LINE_COUNT - 1); i >= 0; i--) {
+    for (x = 0, y = i; x < GOBANG_LINE_COUNT && y >= 0; x++, y--) {
+      posList.push(map[x][y]);
+    }
+
+    selfScore += this.countScore(posList, ComputerPlayer.PLAYER_SELF);
+    otherScore += this.countScore(posList, ComputerPlayer.PLAYER_OTHER);
+    posList.length = 0;
+  }
+
+  // 下斜线/
+  for (i = 1; i < GOBANG_LINE_COUNT; i++) {
+    for (x = i, y = (GOBANG_LINE_COUNT - 1); x < GOBANG_LINE_COUNT && y >= 0; x++, y--) {
+      posList.push(map[x][y]);
+    }
+
+    selfScore += this.countScore(posList, ComputerPlayer.PLAYER_SELF);
+    otherScore += this.countScore(posList, ComputerPlayer.PLAYER_OTHER);
+    posList.length = 0;
+  }
+
+  // console.log(selfScore, otherScore);
+  return selfScore - otherScore;
+}
+
+ComputerPlayer.prototype.hasne = function(map, x, y) {
+  var i, j, count = 1;
+  var beginX = (x - count) > 0 ? (x - count) : 0, endX = Math.min(x + count +1, GOBANG_LINE_COUNT);
+  var beginY = (y - count) > 0 ? (y - count) : 0, endY = Math.min(y + count + 1, GOBANG_LINE_COUNT);
+
+  for (i = beginX; i < endX; i++) {
+    for (j = beginY; j < endY; j++) {
+      if ((i !== 0 || j !== 0) && map[i][j] !== 0) return true;
+    }
+  }
+
+  return false;
+}
+
+// 产生空子序列
+ComputerPlayer.prototype.genPointList = function(map) {
+  var res = [];
+  var i, j;
+
+  for (i = 0; i < GOBANG_LINE_COUNT; i++) {
+    for (j = 0; j < GOBANG_LINE_COUNT; j++) {
+      if (map[i][j] === 0 && this.hasne(map, i, j)) {
+        res.push({
+          x: i,
+          y: j
+        });
+      }
+    }
+  }
+  return res;
+}
+
+ComputerPlayer.prototype.countScore = function(posList, player) {
+  var score = 0;
+  var empty = 0, number = 0, i = 1;
+  
+  if (posList[0] === 0) {
+    empty++;
+  } else if (posList[0] === player) {
+    number++;
+  }
+
+  while(i < posList.length) {
+    if (posList[i] === player) {
+      number++;
+    } else if (posList[i] === 0) {
+      if (number === 0) empty = 1;
+      else {
+        score += this.scoreTable(number, empty + 1);
+        empty = 1;
+        number = 0;
+      }
+    } else {
+      score += this.scoreTable(number, empty);
+      empty = 0;
+      number = 0;
+    }
+    i++;
+  }
+
+  score += this.scoreTable(number, empty);
+  return score;
+}
+
+ComputerPlayer.prototype.scoreTable = function(number, empty) {
+  if (number >= 5) {
+    return 100000;
+  } else if (number === 4) {
+    if (empty === 2)
+      return 10000;
+    else if (empty === 1) 
+      return 1000;
+  } else if (number === 3) {
+    if (empty === 2) 
+      return 1000;
+    else if (empty === 1) 
+      return 100;
+  } else if (number === 2) {
+    if (empty === 2) 
+      return 100;
+    else if (empty === 1) 
+      return 10;
+  }
+  return 0;
 }
 
 
-var player1 = new PersionPlayer('白棋', '#eaeaea');
-var player2 = new PersionPlayer('黑棋', 'black');
+
+var player1 = new PersionPlayer('黑棋', 'black');
+// var player2 = new PersionPlayer('白棋', '#eaeaea');
+var player2 = new ComputerPlayer('白棋机器人', '#eaeaea');
+
 var gobang = new GoBang('chessboard', player1, player2);
 
 var startBtn = document.getElementById('startBtn');
@@ -427,7 +686,7 @@ gobang.setStateChangeHandler(function(payload) {
   var state = payload.state, currentPlayer = payload.currentPlayer;
 
   if (state === GoBang.STATE_PLAYING) {
-    statePanel.innerHTML = '下棋中' + (currentPlayer ? ('当前棋手：' + currentPlayer.flag) : '');
+    statePanel.innerHTML = '下棋中，' + (currentPlayer ? ('当前棋手：' + currentPlayer.flag) : '');
   } else if ((state === GoBang.STATE_PLAYER1_WIN) || (state === GoBang.STATE_PLAYER2_WIN)) {
     statePanel.innerHTML = '游戏结束，' + currentPlayer.flag + '胜';
   }
